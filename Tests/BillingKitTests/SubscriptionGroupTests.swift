@@ -14,12 +14,10 @@ struct SubscriptionGroupTests {
     func storesAllFields() {
         let group = SubscriptionGroup(
             groupID: "21500000",
-            displayName: "Pro",
             isEligibleForIntroOffer: true,
             isFamilyShareable: false
         )
         #expect(group.groupID == "21500000")
-        #expect(group.displayName == "Pro")
         #expect(group.isEligibleForIntroOffer == true)
         #expect(group.isFamilyShareable == false)
     }
@@ -28,13 +26,11 @@ struct SubscriptionGroupTests {
     func eligibilityChangesEquality() {
         let a = SubscriptionGroup(
             groupID: "21500000",
-            displayName: "Pro",
             isEligibleForIntroOffer: true,
             isFamilyShareable: false
         )
         let b = SubscriptionGroup(
             groupID: "21500000",
-            displayName: "Pro",
             isEligibleForIntroOffer: false,
             isFamilyShareable: false
         )
@@ -45,13 +41,11 @@ struct SubscriptionGroupTests {
     func familyShareableChangesEquality() {
         let a = SubscriptionGroup(
             groupID: "21500000",
-            displayName: "Pro",
             isEligibleForIntroOffer: true,
             isFamilyShareable: true
         )
         let b = SubscriptionGroup(
             groupID: "21500000",
-            displayName: "Pro",
             isEligibleForIntroOffer: true,
             isFamilyShareable: false
         )

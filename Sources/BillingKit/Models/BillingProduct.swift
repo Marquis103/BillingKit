@@ -89,10 +89,10 @@ extension BillingProduct {
     /// `isEligibleForIntroOffer` is read from
     /// `subscriptionInfo.isEligibleForIntroOffer` when available; that
     /// API became reliable in iOS 17.4. Older runtimes fall through
-    /// to `true` (the optimistic default) — the system purchase
-    /// sheet will still enforce the actual eligibility, so the
-    /// downside is showing a paywall with intro copy the user can't
-    /// actually claim.
+    /// to `false` — showing "7 days free" copy a user can't actually
+    /// claim looks like a bait-and-switch in the paywall and has
+    /// drawn App Store review attention before; under-selling the
+    /// offer is the safer side to err on.
     init(storeKitProduct product: StoreKit.Product) async {
         let group: SubscriptionGroup?
         if let subscription = product.subscription {
@@ -100,11 +100,10 @@ extension BillingProduct {
             if #available(iOS 17.4, *) {
                 eligible = await subscription.isEligibleForIntroOffer
             } else {
-                eligible = true
+                eligible = false
             }
             group = SubscriptionGroup(
                 groupID: subscription.subscriptionGroupID,
-                displayName: subscription.groupLevel.description,
                 isEligibleForIntroOffer: eligible,
                 isFamilyShareable: product.isFamilyShareable
             )
@@ -127,9 +126,11 @@ extension BillingProduct {
 
 /// Internal wrapper that lets `BillingProduct` keep a hold on a
 /// `StoreKit.Product` without exposing the non-`Sendable` type to
-/// consumers. `@unchecked Sendable` is safe here because
-/// `StoreKit.Product` is documented as thread-safe for read access,
-/// and the box only ever reads.
+/// consumers. `@unchecked Sendable` is sound here because every
+/// consumer reaches the boxed `product` from inside `BillingService`
+/// (an actor), so all access is serialized through a single
+/// isolation domain — there is no concurrent reader/writer pair to
+/// race. The box never mutates the product; it only forwards `.purchase()`.
 struct StoreKitProductBox: @unchecked Sendable {
     let product: StoreKit.Product
 

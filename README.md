@@ -55,7 +55,7 @@ let products = try await billing.fetchProducts()
 let pro = products.first(where: { $0.id == "com.thatSwiftGuy.app.pro.monthly" })!
 
 // 5. Purchase.
-switch try await billing.purchase(pro) {
+switch await billing.purchase(pro) {
 case .success(let transaction):
     await coordinator.openConfirmation(transaction)
 case .pending:

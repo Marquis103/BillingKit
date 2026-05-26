@@ -30,9 +30,9 @@ public protocol BillingServicing: Sendable {
     /// - Returns: A `BillingPurchaseResult` distinguishing success
     ///   (verifier approved + transaction finished), pending (parental
     ///   approval required), cancellation (user dismissed sheet), and
-    ///   failure. Hosts should pattern-match on the result rather than
-    ///   try/catch.
-    func purchase(_ product: BillingProduct) async throws -> BillingPurchaseResult
+    ///   failure. All failure modes route through `.failed(BillingError)` —
+    ///   pattern-match on the result, the method does not throw.
+    func purchase(_ product: BillingProduct) async -> BillingPurchaseResult
 
     /// Force a sync with the App Store and return the user's current
     /// unrevoked entitlements. Each transaction passes through the

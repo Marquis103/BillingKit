@@ -26,14 +26,15 @@ import Foundation
 /// Both fields reflect the snapshot at the moment `fetchProducts()`
 /// resolved — they don't live-update. Re-fetch when the customer
 /// completes a purchase if you need fresh values.
+///
+/// There is intentionally no `displayName` — StoreKit 2 doesn't
+/// expose a localized group name (`groupLevel` is an Int tier rank).
+/// Hosts supply tier copy from their own localization file.
 public struct SubscriptionGroup: Sendable, Equatable {
 
     /// The opaque group identifier from App Store Connect. Useful as
     /// a key when the host caches per-group state.
     public let groupID: String
-
-    /// Human-readable group name (also from App Store Connect).
-    public let displayName: String
 
     /// True if the customer is currently eligible for the
     /// introductory offer attached to this group. False once they've
@@ -46,12 +47,10 @@ public struct SubscriptionGroup: Sendable, Equatable {
 
     public init(
         groupID: String,
-        displayName: String,
         isEligibleForIntroOffer: Bool,
         isFamilyShareable: Bool
     ) {
         self.groupID = groupID
-        self.displayName = displayName
         self.isEligibleForIntroOffer = isEligibleForIntroOffer
         self.isFamilyShareable = isFamilyShareable
     }

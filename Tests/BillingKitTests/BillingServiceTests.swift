@@ -104,7 +104,7 @@ struct BillingServiceTests {
         let products = try await service.fetchProducts()
         let product = try #require(products.first)
 
-        let result = try await service.purchase(product)
+        let result = await service.purchase(product)
 
         guard case .success(let transaction) = result else {
             Issue.record("Expected .success, got \(result)")
@@ -132,7 +132,7 @@ struct BillingServiceTests {
         let products = try await service.fetchProducts()
         let product = try #require(products.first)
 
-        let result = try await service.purchase(product)
+        let result = await service.purchase(product)
 
         guard case .failed(let error) = result else {
             Issue.record("Expected .failed, got \(result)")
@@ -158,7 +158,7 @@ struct BillingServiceTests {
 
         let products = try await service.fetchProducts()
         let product = try #require(products.first)
-        _ = try await service.purchase(product)
+        _ = await service.purchase(product)
 
         let restored = try await service.restorePurchases()
         #expect(restored.contains(where: { $0.productID == productID }))
@@ -178,7 +178,7 @@ struct BillingServiceTests {
 
         let products = try await service.fetchProducts()
         let product = try #require(products.first)
-        let result = try await service.purchase(product)
+        let result = await service.purchase(product)
         guard case .success(let purchased) = result else {
             Issue.record("Setup purchase failed: \(result)")
             return

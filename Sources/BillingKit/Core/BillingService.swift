@@ -29,7 +29,7 @@ public actor BillingService: BillingServicing {
     public nonisolated let transactionStream: AsyncStream<BillingTransaction>
 
     private let productIDs: Set<String>
-    private let verifier: ReceiptVerifier
+    private let gate: VerificationGate
     private let streamContinuation: AsyncStream<BillingTransaction>.Continuation
     private let cacheTTL: TimeInterval = 300
 
@@ -52,7 +52,7 @@ public actor BillingService: BillingServicing {
     ///     production builds cannot accidentally ship without one.
     public init(productIDs: Set<String>, verifier: ReceiptVerifier) {
         self.productIDs = productIDs
-        self.verifier = verifier
+        self.gate = VerificationGate(verifier: verifier)
 
         var continuation: AsyncStream<BillingTransaction>.Continuation!
         self.transactionStream = AsyncStream { continuation = $0 }
@@ -66,6 +66,20 @@ public actor BillingService: BillingServicing {
 
     // MARK: - Observation lifecycle
 
+    /// Spawn the long-running task that drains
+    /// `StoreKit.Transaction.updates` and routes each event through
+    /// the verifier chokepoint. Idempotent.
+    ///
+    /// **Lifecycle (no retain cycle):** the task captures `self`
+    /// weakly. The actor holds the task handle in
+    /// `transactionUpdatesTask`, but a task handle does not retain
+    /// `self`. When the host drops its last reference to the service,
+    /// the actor deallocates normally, `deinit` cancels the task
+    /// handle, and the for-await loop exits on cancellation (Apple's
+    /// AsyncSequence implementations honor `Task.isCancelled`). A
+    /// verifier call in flight at the moment of teardown will hold
+    /// `self` briefly via the implicit `await` retain; the actor
+    /// finishes the call and then deallocates.
     public func startObservingTransactionUpdates() {
         guard transactionUpdatesTask == nil else { return }
         transactionUpdatesTask = Task { [weak self] in
@@ -119,7 +133,7 @@ public actor BillingService: BillingServicing {
         return mapped
     }
 
-    public func purchase(_ product: BillingProduct) async throws -> BillingPurchaseResult {
+    public func purchase(_ product: BillingProduct) async -> BillingPurchaseResult {
         let storeKitProduct = product.storeKitProduct.product
 
         let result: StoreKit.Product.PurchaseResult
@@ -196,11 +210,7 @@ public actor BillingService: BillingServicing {
         case .unverified(_, let error):
             throw BillingError.verificationFailed(String(describing: error))
         case .verified(let transaction):
-            do {
-                _ = try await verifier.verify(result.jwsRepresentation)
-            } catch {
-                throw BillingError.verificationFailed(String(describing: error))
-            }
+            try await gate.verify(jws: result.jwsRepresentation)
             let billing = BillingTransaction(transaction: transaction)
             await transaction.finish()
             streamContinuation.yield(billing)
@@ -219,11 +229,7 @@ public actor BillingService: BillingServicing {
         case .unverified(_, let error):
             throw BillingError.verificationFailed(String(describing: error))
         case .verified(let transaction):
-            do {
-                _ = try await verifier.verify(result.jwsRepresentation)
-            } catch {
-                throw BillingError.verificationFailed(String(describing: error))
-            }
+            try await gate.verify(jws: result.jwsRepresentation)
             return BillingTransaction(transaction: transaction)
         }
     }
