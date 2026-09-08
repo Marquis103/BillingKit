@@ -5,11 +5,13 @@
 //
 
 import Foundation
+#if !os(Android)
 import StoreKit
+#endif
 
 /// `Sendable` projection of `StoreKit.Product`. Carries the fields a
-/// paywall typically renders (display name, description, price) plus
-/// a private hold on the underlying `Product` so
+/// paywall typically renders (display name, description, price) plus,
+/// on Darwin, a private hold on the underlying `Product` so
 /// `BillingService.purchase(_:)` can call `.purchase()` on it
 /// without re-fetching.
 ///
@@ -17,7 +19,10 @@ import StoreKit
 /// it lacks `Sendable` conformance and pinning it to the public
 /// surface would force every consumer into `@unchecked Sendable`
 /// workarounds. The kit hands back a flat value; the kit alone
-/// reaches through to `Product` when it needs to.
+/// reaches through to `Product` when it needs to. The public surface
+/// is identical on every platform — only the private hold is
+/// Darwin-gated, which is what lets the type (and the whole
+/// `BillingServicing` seam) compile for Android.
 public struct BillingProduct: Sendable, Identifiable, Equatable {
 
     /// The StoreKit product ID (e.g.
@@ -49,16 +54,53 @@ public struct BillingProduct: Sendable, Identifiable, Equatable {
     /// non-renewing products.
     public let subscriptionGroup: SubscriptionGroup?
 
+#if !os(Android)
     /// Private hold on the StoreKit product so `purchase()` doesn't
-    /// have to re-resolve by ID. Excluded from `Equatable` (compared
-    /// via `id` only) and from `Sendable` checks (boxed through the
-    /// `Sendable`-via-`@unchecked` wrapper below).
-    let storeKitProduct: StoreKitProductBox
+    /// have to re-resolve by ID. `nil` for values built with the
+    /// public initializer (host mocks, non-StoreKit stores) —
+    /// `BillingService.purchase(_:)` refuses those with
+    /// `.failed(.purchaseFailed)`. Excluded from `Equatable`
+    /// (compared via `id` only) and from `Sendable` checks (boxed
+    /// through the `Sendable`-via-`@unchecked` wrapper below).
+    /// Darwin-only: the Play Billing adapter
+    /// (SkipMarketplaceBillingAdapter, W5.4b) re-resolves by `id`
+    /// instead of holding a platform object.
+    let storeKitProduct: StoreKitProductBox?
+#endif
 
     public static func == (lhs: BillingProduct, rhs: BillingProduct) -> Bool {
         lhs.id == rhs.id
     }
 
+    /// Portable public initializer. Values built this way carry no
+    /// StoreKit backing: on Darwin, passing one to
+    /// `BillingService.purchase(_:)` returns
+    /// `.failed(.purchaseFailed(...))` — purchase only products
+    /// obtained from `fetchProducts()`. Intended for host test
+    /// mocks/previews and for non-StoreKit billing adapters
+    /// (Play Billing, W5.4b).
+    public init(
+        id: String,
+        displayName: String,
+        description: String,
+        displayPrice: String,
+        price: Decimal,
+        currencyCode: String,
+        subscriptionGroup: SubscriptionGroup? = nil
+    ) {
+        self.id = id
+        self.displayName = displayName
+        self.description = description
+        self.displayPrice = displayPrice
+        self.price = price
+        self.currencyCode = currencyCode
+        self.subscriptionGroup = subscriptionGroup
+#if !os(Android)
+        self.storeKitProduct = nil
+#endif
+    }
+
+#if !os(Android)
     init(
         id: String,
         displayName: String,
@@ -78,7 +120,12 @@ public struct BillingProduct: Sendable, Identifiable, Equatable {
         self.subscriptionGroup = subscriptionGroup
         self.storeKitProduct = StoreKitProductBox(storeKitProduct)
     }
+#endif
 }
+
+// Android: excluded — StoreKit.Product mapping + the live-product box.
+// Successor: skip-marketplace Play Billing adapter (SkipMarketplaceBillingAdapter), W5.4b.
+#if !os(Android)
 
 extension BillingProduct {
 
@@ -138,3 +185,5 @@ struct StoreKitProductBox: @unchecked Sendable {
         self.product = product
     }
 }
+
+#endif // !os(Android)
