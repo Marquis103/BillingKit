@@ -4,6 +4,11 @@
 //  Copyright © 2026 BillingKit. All rights reserved.
 //
 
+// Android: excluded — StoreKit 2 actor implementation of BillingServicing (purchase,
+// entitlements, Transaction.updates verification chokepoint). Successor: skip-marketplace
+// Play Billing adapter (SkipMarketplaceBillingAdapter), W5.4b.
+#if !os(Android)
+
 import Foundation
 import StoreKit
 
@@ -134,7 +139,14 @@ public actor BillingService: BillingServicing {
     }
 
     public func purchase(_ product: BillingProduct) async -> BillingPurchaseResult {
-        let storeKitProduct = product.storeKitProduct.product
+        guard let storeKitProduct = product.storeKitProduct?.product else {
+            // Hand-constructed BillingProduct (portable public init) — no
+            // StoreKit.Product to purchase. Reachable only by host code that
+            // bypassed fetchProducts(); fail with a diagnosis, never crash.
+            return .failed(.purchaseFailed(
+                "BillingProduct '\(product.id)' has no StoreKit backing; purchase products returned by fetchProducts()"
+            ))
+        }
 
         let result: StoreKit.Product.PurchaseResult
         do {
@@ -235,3 +247,5 @@ public actor BillingService: BillingServicing {
     }
 
 }
+
+#endif // !os(Android)
