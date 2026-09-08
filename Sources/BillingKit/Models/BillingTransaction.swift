@@ -5,7 +5,9 @@
 //
 
 import Foundation
+#if !os(Android)
 import StoreKit
+#endif
 
 /// `Sendable`, decoded snapshot of `StoreKit.Transaction`. Crosses
 /// the actor boundary out of `BillingService` so view models in the
@@ -71,6 +73,10 @@ public struct BillingTransaction: Sendable, Equatable, Identifiable {
     }
 }
 
+// Android: excluded — StoreKit.Transaction decode. Successor: SkipMarketplaceBillingAdapter
+// (W5.4b) maps Play purchases through the public memberwise initializer above.
+#if !os(Android)
+
 extension BillingTransaction {
 
     /// Internal-only initializer that decodes a StoreKit transaction
@@ -86,3 +92,5 @@ extension BillingTransaction {
         self.isUpgraded = transaction.isUpgraded
     }
 }
+
+#endif // !os(Android)
