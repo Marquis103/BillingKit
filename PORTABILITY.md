@@ -63,7 +63,13 @@ server compares the verified purchase's token with the claiming account.
 |---|---|---|
 | Attach | `Product.PurchaseOption.appAccountToken(uuid)` — **wired** | `BillingFlowParams.Builder.setObfuscatedAccountId(uuid.uuidString)` (optionally `setObfuscatedProfileId`) — **not wired** |
 | Read back | `Transaction.appAccountToken` → `BillingTransaction.appAccountToken` — **wired** | `Purchase.getAccountIdentifiers()?.getObfuscatedAccountId()` → `UUID(uuidString:)` → the memberwise init's `appAccountToken:` — **not wired** |
-| Server reads | `appAccountToken` in the signed transaction (JWS) | `obfuscatedExternalAccountId` in the Play Developer API purchase resource |
+| Server reads | `appAccountToken` in the signed transaction (JWS) | `externalAccountIdentifiers.obfuscatedExternalAccountId` in the `purchases.subscriptionsv2.get` response (a top-level `obfuscatedExternalAccountId` is the older v1 `purchases.subscriptions` shape) |
+
+**Compare as UUIDs, never as strings.** Swift's `UUID.uuidString` is upper-case; Postgres
+`uuid` text and `auth.uid()` are lower-case, and a store hands back whatever string it was
+given. On both stores the server parses the token and the account id as UUIDs (or
+lower-cases both sides) before comparing — a case-sensitive string compare rejects a
+legitimate purchase.
 
 **The Android gap.** This kit ships no Android adapter: the Play conformer lives in the host
 (Ayes: `SkipMarketplaceBillingAdapter`) and reaches Play only through skip-marketplace's
