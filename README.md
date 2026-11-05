@@ -54,8 +54,10 @@ await billing.startObservingTransactionUpdates()
 let products = try await billing.fetchProducts()
 let pro = products.first(where: { $0.id == "com.thatSwiftGuy.app.pro.monthly" })!
 
-// 5. Purchase.
-switch await billing.purchase(pro) {
+// 5. Purchase, bound to the signed-in account (see "Binding a
+//    purchase to an account" below). `billing.purchase(pro)` with no
+//    token is unchanged.
+switch await billing.purchase(pro, appAccountToken: currentUser.id) {
 case .success(let transaction):
     await coordinator.openConfirmation(transaction)
 case .pending:
@@ -66,6 +68,16 @@ case .failed(let error):
     await coordinator.showError(error)
 }
 ```
+
+## Binding a purchase to an account
+
+`purchase(_:appAccountToken:)` attaches the host's id for the signed-in user (a `UUID`, never raw PII) to the transaction. On iOS it is sent as StoreKit 2's `Product.PurchaseOption.appAccountToken(_:)`; the App Store records it on the transaction — every renewal of a subscription carries the token from the original purchase — and it comes back as `BillingTransaction.appAccountToken`.
+
+The token's job is server-side: your verifier's backend reads `appAccountToken` from the verified JWS and checks it equals the account claiming the purchase, so a transaction cannot be claimed by another account. The client-side `BillingTransaction.appAccountToken` is informational; do not treat it as the check.
+
+* `purchase(product)` is exactly `purchase(product, appAccountToken: nil)` — no option is sent, behaviour is unchanged.
+* **Custom `BillingServicing` conformers** (host mocks, other store adapters) compile unchanged: the protocol extension supplies a default `purchase(_:appAccountToken:)`. With `nil` it forwards to the conformer's `purchase(_:)`; with a token it **fails closed** — `.failed(.purchaseFailed(...))`, no purchase sheet — because a conformer that silently dropped the token would charge the user for a transaction the server then refuses to bind. Implement the member to carry the token (a mock records it).
+* Android (Play Billing) status and successor: see [`PORTABILITY.md`](./PORTABILITY.md#account-token-purchase_appaccounttoken).
 
 ## ReceiptVerifier contract
 
