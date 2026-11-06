@@ -139,6 +139,18 @@ public actor BillingService: BillingServicing {
     }
 
     public func purchase(_ product: BillingProduct) async -> BillingPurchaseResult {
+        await purchase(product, appAccountToken: nil)
+    }
+
+    /// StoreKit 2 purchase with the host's account id attached as
+    /// `Product.PurchaseOption.appAccountToken`. StoreKit stamps it on
+    /// the transaction, which is what the verifier's server sees in
+    /// the JWS and what `BillingTransaction.appAccountToken` reads
+    /// back. `nil` sends no option — identical to `purchase(_:)`.
+    public func purchase(
+        _ product: BillingProduct,
+        appAccountToken: UUID?
+    ) async -> BillingPurchaseResult {
         guard let storeKitProduct = product.storeKitProduct?.product else {
             // Hand-constructed BillingProduct (portable public init) — no
             // StoreKit.Product to purchase. Reachable only by host code that
@@ -150,7 +162,9 @@ public actor BillingService: BillingServicing {
 
         let result: StoreKit.Product.PurchaseResult
         do {
-            result = try await storeKitProduct.purchase()
+            result = try await storeKitProduct.purchase(
+                options: Self.purchaseOptions(appAccountToken: appAccountToken)
+            )
         } catch {
             return .failed(.purchaseFailed(String(describing: error)))
         }
@@ -207,6 +221,17 @@ public actor BillingService: BillingServicing {
             entitlements.append(BillingTransaction(transaction: transaction))
         }
         return entitlements
+    }
+
+    // MARK: - Internal
+
+    /// The StoreKit purchase options for a purchase call. Factored out
+    /// so the pass-through is unit-testable without `SKTestSession`:
+    /// `nil` → no options (today's `purchase()`), a token → exactly
+    /// `.appAccountToken(token)`.
+    static func purchaseOptions(appAccountToken: UUID?) -> Set<StoreKit.Product.PurchaseOption> {
+        guard let appAccountToken else { return [] }
+        return [.appAccountToken(appAccountToken)]
     }
 
     // MARK: - Private

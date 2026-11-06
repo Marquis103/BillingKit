@@ -52,6 +52,16 @@ public struct BillingTransaction: Sendable, Equatable, Identifiable {
     /// `transactionStream`) as the authoritative entitlement.
     public let isUpgraded: Bool
 
+    /// The host's account id attached at purchase time
+    /// (`purchase(_:appAccountToken:)`), as the store reports it back.
+    /// StoreKit: `Transaction.appAccountToken` — set on the original
+    /// purchase and carried by every renewal. Nil when the purchase
+    /// was made without a token, or by a store adapter that does not
+    /// surface one. Read it to bind the transaction to the signed-in
+    /// account; the authoritative check belongs on the server, which
+    /// reads the same claim from the verified JWS.
+    public let appAccountToken: UUID?
+
     public var id: String { transactionID }
 
     public init(
@@ -61,7 +71,8 @@ public struct BillingTransaction: Sendable, Equatable, Identifiable {
         purchaseDate: Date,
         expiresDate: Date? = nil,
         revocationDate: Date? = nil,
-        isUpgraded: Bool = false
+        isUpgraded: Bool = false,
+        appAccountToken: UUID? = nil
     ) {
         self.transactionID = transactionID
         self.originalTransactionID = originalTransactionID
@@ -70,6 +81,7 @@ public struct BillingTransaction: Sendable, Equatable, Identifiable {
         self.expiresDate = expiresDate
         self.revocationDate = revocationDate
         self.isUpgraded = isUpgraded
+        self.appAccountToken = appAccountToken
     }
 }
 
@@ -90,6 +102,7 @@ extension BillingTransaction {
         self.expiresDate = transaction.expirationDate
         self.revocationDate = transaction.revocationDate
         self.isUpgraded = transaction.isUpgraded
+        self.appAccountToken = transaction.appAccountToken
     }
 }
 

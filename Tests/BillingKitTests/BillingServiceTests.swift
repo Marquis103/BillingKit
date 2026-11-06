@@ -116,6 +116,49 @@ struct BillingServiceTests {
         #expect(signed.isEmpty == false)
     }
 
+    @Test("purchase with an appAccountToken returns a transaction stamped with that token")
+    func purchaseWithTokenStampsTransaction() async throws {
+        let session = try makeSession()
+        defer { session.clearTransactions() }
+
+        let service = BillingService(
+            productIDs: [productID],
+            verifier: MockReceiptVerifier()
+        )
+        let products = try await service.fetchProducts()
+        let product = try #require(products.first)
+        let token = UUID()
+
+        let result = await service.purchase(product, appAccountToken: token)
+
+        guard case .success(let transaction) = result else {
+            Issue.record("Expected .success, got \(result)")
+            return
+        }
+        #expect(transaction.appAccountToken == token)
+    }
+
+    @Test("purchase without a token returns a transaction with no appAccountToken")
+    func purchaseWithoutTokenLeavesTransactionUnbound() async throws {
+        let session = try makeSession()
+        defer { session.clearTransactions() }
+
+        let service = BillingService(
+            productIDs: [productID],
+            verifier: MockReceiptVerifier()
+        )
+        let products = try await service.fetchProducts()
+        let product = try #require(products.first)
+
+        let result = await service.purchase(product)
+
+        guard case .success(let transaction) = result else {
+            Issue.record("Expected .success, got \(result)")
+            return
+        }
+        #expect(transaction.appAccountToken == nil)
+    }
+
     @Test("purchase reports .failed when the verifier rejects")
     func purchaseFailsWhenVerifierRejects() async throws {
         let session = try makeSession()
